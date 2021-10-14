@@ -191,17 +191,22 @@ class FlaskProjectTest(FlaskTest):
 
         ]
     links = \
-    [
-        "{}api/recipe", #0
-        "{}api/recipe?ingredients={}", #1
-        "{}api/recipe/new", #2
-        "{}api/recipe/{}",  # 3
-    ]
+        [
+            "{}api/recipe",  # 0
+            "{}api/recipe?ingredients={}",  # 1
+            "{}api/recipe/new",  # 2
+            "{}api/recipe/{}",  # 3
+        ]
     strings = \
-    [
-        "No recipe here yet", #0
-        "No recipe for these ingredients" #1
-    ]
+        [
+            "No recipe here yet",  # 0
+            "No recipe for these ingredients"  # 1
+        ]
+    json_responses = \
+        [
+            {"error": strings[0]},
+            {"error": strings[1]}
+        ]
 
     def my_init(self):
         try:
@@ -213,13 +218,13 @@ class FlaskProjectTest(FlaskTest):
         super().__init__(source_name)
         self.my_init()
     def check_recipes_str(self, recipes:list, content:str, recipe_added, enough_ingredients):
+        if not content:
+            raise WrongAnswer(self.wrong_answers[3].format(self.links[1].format("GET /", "...")))
+        try:#check correct json format
+            recipes_dict = json.loads(content)
+        except:
+            raise WrongAnswer(self.wrong_answers[7].format(self.links[1].format("GET /", "..."), content))
         if recipe_added and enough_ingredients:
-            if not content:
-                raise WrongAnswer(self.wrong_answers[3].format(self.links[1].format("GET /", "...")))
-            try:
-                recipes_dict = json.loads(content)
-            except:
-                raise WrongAnswer(self.wrong_answers[7].format(self.links[1].format("GET /", "..."), content))
             if len(recipes) != len(recipes_dict):
                 raise WrongAnswer(self.wrong_answers[11].format(self.links[1].format("GET /", "...")))
             for recipe_dict in recipes_dict:
@@ -232,14 +237,32 @@ class FlaskProjectTest(FlaskTest):
                 if len(recipe_dict.keys()) > 3:
                     raise WrongAnswer(self.wrong_answers[6].format(self.links[1].format("GET /", "..."), len(recipe_dict.keys())))
         elif recipe_added == False:
-            if self.strings[0] != content:
-                raise WrongAnswer(self.wrong_answers[4].format(self.links[1].format("GET /", "..."), self.strings[0], content))
-        elif recipe_added and enough_ingredients == False:
-            if self.strings[1] != content:
-                raise WrongAnswer(self.wrong_answers[5].format(self.links[1].format("GET /", "..."), self.strings[1], content))
+            if recipes_dict != self.json_responses[0]:
+                raise WrongAnswer(self.wrong_answers[4].format(self.links[1].format("GET /", "..."), str(self.json_responses[0]), content))
+        elif recipe_added and not enough_ingredients:
+            if recipes_dict != self.json_responses[1]:
+                raise WrongAnswer(self.wrong_answers[5].format(self.links[1].format("GET /", "..."), str(self.json_responses[1]), content))
 
     async def test_get_recipe_by_ingredients(self, recipes: list, recipe_added=True, enough_ingredients=True):
         r = requests.get(self.links[1].format(self.get_url(), recipes[0].get_ingredients_url_parameters()))
+        if r.status_code != 200:
+            raise WrongAnswer(self.wrong_answers[1].format(self.links[1].format("GET /", "..."), r.status_code))
+        content = r.content.decode('UTF-8')
+        self.check_recipes_str(recipes, content, recipe_added, enough_ingredients)
+
+    async def test_get_recipes_by_ingredients(self, recipes: list, recipe_added=True, enough_ingredients=True):
+        ingredients_url_parameters = []
+        for recipe in recipes:
+            ingredients_url_parameters.append(recipe.get_ingredients_url_parameters())
+        result_ingredients = []
+        for ingredients in ingredients_url_parameters:
+            for ingredient in ingredients.split('|'):
+                if ingredient not in result_ingredients:
+                    result_ingredients.append(ingredient)
+        ingredients_parameters = "|".join(result_ingredients)
+
+
+        r = requests.get(self.links[1].format(self.get_url(), ingredients_parameters))
         if r.status_code != 200:
             raise WrongAnswer(self.wrong_answers[1].format(self.links[1].format("GET /", "..."), r.status_code))
         content = r.content.decode('UTF-8')
@@ -354,33 +377,41 @@ class FlaskProjectTest(FlaskTest):
     @dynamic_test(order=6)
     def test6(self):
         ExitHandler.revert_exit()
-        print("Get recipe by 2 recipe ingredients")
+        print("Get recipes by 2 recipe ingredients")
         asyncio.get_event_loop().run_until_complete(self.test_get_recipe_by_ingredients([self.list_recipes[3]], True, True))
         return CheckResult.correct()
 
     @dynamic_test(order=7)
     def test7(self):
         ExitHandler.revert_exit()
-        print("Get recipe by invalid recipe ingredients")
-        asyncio.get_event_loop().run_until_complete(self.test_get_recipe_by_ingredients([self.list_recipes[4]], True, False))
+        print("Get recipes by added ingredients")
+        asyncio.get_event_loop().run_until_complete(
+            self.test_get_recipes_by_ingredients([self.list_recipes[3], self.list_recipes[0]], True, True))
         return CheckResult.correct()
 
     @dynamic_test(order=8)
     def test8(self):
         ExitHandler.revert_exit()
-        print("Get recipe by invalid id")
-        asyncio.get_event_loop().run_until_complete(self.test_get_recipe_by_id(99))
+        print("Get recipe by invalid recipe ingredients")
+        asyncio.get_event_loop().run_until_complete(self.test_get_recipe_by_ingredients([self.list_recipes[4]], True, False))
         return CheckResult.correct()
 
     @dynamic_test(order=9)
     def test9(self):
         ExitHandler.revert_exit()
-        print("Get recipe valid id, from added recipe")
-        asyncio.get_event_loop().run_until_complete(self.test_get_recipe_by_id(self.list_added_recipes[0].id, True, self.list_added_recipes[0]))
+        print("Get recipe by invalid id")
+        asyncio.get_event_loop().run_until_complete(self.test_get_recipe_by_id(99))
         return CheckResult.correct()
 
     @dynamic_test(order=10)
     def test10(self):
+        ExitHandler.revert_exit()
+        print("Get recipe valid id, from added recipe")
+        asyncio.get_event_loop().run_until_complete(self.test_get_recipe_by_id(self.list_added_recipes[0].id, True, self.list_added_recipes[0]))
+        return CheckResult.correct()
+
+    @dynamic_test(order=11)
+    def test11(self):
         ExitHandler.revert_exit()
         print("Get another recipe valid id, from added recipe")
         asyncio.get_event_loop().run_until_complete(

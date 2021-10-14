@@ -59,13 +59,14 @@ class FlaskProjectTest(FlaskTest):
     wrong_answers = \
         [
             "File 'recipes.xml' not exists or incorrect format, please reload the project",#0
-            "{} route should return code 200, now status code is {}", #1
+            "{} route should return code 200, if the recipe data is correct, now status code is {}", #1
             "{} {} key should be in the json response", #2
             "{} response should not be empty", #3
             "{} route should return '{}' if no recipes added, now '{}'", #4
             "{} route should return '{}' If not enough ingredients, now '{}'",  # 5
             "{} route should return json with 3 keys, now '{}'",  # 6
-            "{} route should return correct json response, if recipe added, now response: '{}'",  # 7
+            "{} route should return correct json response, now response: '{}'",  # 7
+            "{} route should return code 400, if the recipe post data is incorrect or empty, now status code is {}",  # 8
         ]
     links = \
     [
@@ -78,6 +79,11 @@ class FlaskProjectTest(FlaskTest):
         "No recipe here yet", #0
         "No recipe for these ingredients" #1
     ]
+    json_responses = \
+    [
+        {"error": strings[0]},
+        {"error": strings[1]}
+    ]
 
     def my_init(self):
         try:
@@ -89,11 +95,11 @@ class FlaskProjectTest(FlaskTest):
         super().__init__(source_name)
         self.my_init()
     def check_recipe_str(self, recipe:Recipe_info, content:str, recipe_added, enough_ingredients):
+        try:#check correct json format
+            recipe_dict = json.loads(content)
+        except:
+            raise WrongAnswer(self.wrong_answers[7].format(self.links[1].format("GET /", "..."), content))
         if recipe_added and enough_ingredients:
-            try:
-                recipe_dict = json.loads(content)
-            except:
-                raise WrongAnswer(self.wrong_answers[7].format(self.links[1].format("GET /", "..."), content))
             if not content:
                 raise WrongAnswer(self.wrong_answers[3].format(self.links[1].format("GET /", "...")))
             if "title" in recipe_dict.keys() == False:
@@ -105,11 +111,11 @@ class FlaskProjectTest(FlaskTest):
             if len(recipe_dict.keys()) > 3:
                 raise WrongAnswer(self.wrong_answers[6].format(self.links[1].format("GET /", "..."), len(recipe_dict.keys())))
         elif recipe_added == False:
-            if self.strings[0] != content:
-                raise WrongAnswer(self.wrong_answers[4].format(self.links[1].format("GET /", "..."), self.strings[0], content))
+            if recipe_dict != self.json_responses[0]:
+                raise WrongAnswer(self.wrong_answers[4].format(self.links[1].format("GET /", "..."), str(self.json_responses[0]), content))
         elif recipe_added and enough_ingredients == False:
-            if self.strings[1] != content:
-                raise WrongAnswer(self.wrong_answers[5].format(self.links[1].format("GET /", "..."), self.strings[1], content))
+            if recipe_dict != self.json_responses[1]:
+                raise WrongAnswer(self.wrong_answers[5].format(self.links[1].format("GET /", "..."), str(self.json_responses[1]), content))
 
     async def test_get_recipe(self, recipe:Recipe_info, recipe_added=True, enough_ingredients = True):
         r = requests.get(self.links[1].format(self.get_url(), recipe.get_ingredients_url_parameters()))
@@ -122,6 +128,11 @@ class FlaskProjectTest(FlaskTest):
         r = requests.post(self.links[0].format(self.get_url()), json=str(recipe))
         if r.status_code != 204:
             raise WrongAnswer(self.wrong_answers[1].format(self.links[1].format("POST /", "..."), r.status_code))
+
+    async def test_empty_post_recipe(self):
+        r = requests.post(self.links[0].format(self.get_url()), json="{}")
+        if r.status_code != 400:
+            raise WrongAnswer(self.wrong_answers[8].format(self.links[1].format("POST /", "..."), r.status_code))
 
     @dynamic_test(order=1)
     def test1(self):
@@ -157,6 +168,12 @@ class FlaskProjectTest(FlaskTest):
     def test6(self):
         ExitHandler.revert_exit()
         asyncio.get_event_loop().run_until_complete(self.test_get_recipe(self.list_recipes[3], True, True))
+        return CheckResult.correct()
+
+    @dynamic_test(order=7)
+    def test7(self):
+        ExitHandler.revert_exit()
+        asyncio.get_event_loop().run_until_complete(self.test_empty_post_recipe())
         return CheckResult.correct()
 
 

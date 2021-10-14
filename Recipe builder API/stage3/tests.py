@@ -207,6 +207,11 @@ class FlaskProjectTest(FlaskTest):
         "No recipe here yet", #0
         "No recipe for these ingredients" #1
     ]
+    json_responses = \
+        [
+            {"error": strings[0]},
+            {"error": strings[1]}
+        ]
 
     def my_init(self):
         try:
@@ -218,13 +223,13 @@ class FlaskProjectTest(FlaskTest):
         super().__init__(source_name)
         self.my_init()
     def check_recipes_str(self, recipes:list, content:str, recipe_added, enough_ingredients):
+        try:
+            recipes_dict = json.loads(content)
+        except:
+            raise WrongAnswer(self.wrong_answers[7].format(self.links[1].format("GET /", "..."), content))
         if recipe_added and enough_ingredients:
             if not content:
                 raise WrongAnswer(self.wrong_answers[3].format(self.links[1].format("GET /", "...")))
-            try:
-                recipes_dict = json.loads(content)
-            except:
-                raise WrongAnswer(self.wrong_answers[7].format(self.links[1].format("GET /", "..."), content))
             if len(recipes) != len(recipes_dict):
                 raise WrongAnswer(self.wrong_answers[11].format(self.links[1].format("GET /", "..."), len(recipes_dict), len(recipes),))
             for recipe_dict in recipes_dict:
@@ -240,11 +245,11 @@ class FlaskProjectTest(FlaskTest):
                 if len(recipe_dict.keys()) > 4:
                     raise WrongAnswer(self.wrong_answers[6].format(self.links[1].format("GET /", "..."), 4, len(recipe_dict.keys())))
         elif recipe_added == False:
-            if self.strings[0] != content:
-                raise WrongAnswer(self.wrong_answers[4].format(self.links[1].format("GET /", "..."), self.strings[0], content))
-        elif recipe_added and enough_ingredients == False:
-            if self.strings[1] != content:
-                raise WrongAnswer(self.wrong_answers[5].format(self.links[1].format("GET /", "..."), self.strings[1], content))
+            if recipes_dict != self.json_responses[0]:
+                raise WrongAnswer(self.wrong_answers[4].format(self.links[1].format("GET /", "..."), str(self.json_responses[0]), content))
+        elif recipe_added and not enough_ingredients:
+            if recipes_dict != self.json_responses[1]:
+                raise WrongAnswer(self.wrong_answers[5].format(self.links[1].format("GET /", "..."), str(self.json_responses[1]), content))
 
     async def test_get_recipe_by_ingredients(self, recipes: list, recipe_added=True, enough_ingredients=True):
         r = requests.get(self.links[1].format(self.get_url(), recipes[0].get_ingredients_url_parameters()))

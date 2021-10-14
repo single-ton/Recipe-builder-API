@@ -38,36 +38,36 @@ class Recipe_info:
 
 app = Flask(__name__)
 current_recipe_obj:Recipe_info = None
-error_response:dict
+no_recipes_message = "No recipe here yet"
+no_recipes_for_ingredients_message = "No recipe for these ingredients"
 
 @app.route('/api/recipe', methods=['GET'])
 def get_recipe():
-    global current_recipe_obj
-    error_response = {}
+    global no_recipes_message, no_recipes_for_ingredients_message, current_recipe_obj
     if current_recipe_obj is None:
-        error_response['error'] = "No recipe here yet"
-        return json.dumps(error_response)
+        return json.dumps({'error': no_recipes_message})
     else:
-        error_response = dict
-        error_response['error'] = "No recipe for these ingredients"
         if 'ingredients' not in request.args:
-            return json.dumps(error_response)
+            return json.dumps({'error': no_recipes_for_ingredients_message})
         ingredients = request.args['ingredients'].split('|')
         if len(ingredients) != len(current_recipe_obj.ingredients):
-            return json.dumps(error_response)
+            return json.dumps({'error': no_recipes_for_ingredients_message})
         for ingredient in current_recipe_obj.ingredients:
             if ingredient not in ingredients:
-                return json.dumps(error_response)
+                return json.dumps({'error': no_recipes_for_ingredients_message})
         return str(current_recipe_obj)
 
 @app.route('/api/recipe', methods=['POST'])
 def post_recipe():
     global current_recipe_obj
     if request.json!=None:
-        current_recipe_obj = Recipe_info(request.json)
-        return Response(status=204)
+        try:
+            current_recipe_obj = Recipe_info(request.json)
+            return Response(status=204)
+        except: return Response(status=400)
+
     else:
-        Response(status=400)
+        return Response(status=400)
 
 # don't change the following way to run flask:
 if __name__ == '__main__':

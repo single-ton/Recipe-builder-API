@@ -105,6 +105,8 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///recipes.db'
 db = SQLAlchemy(app)
 
+no_recipes_message = "No recipe here yet"
+no_recipes_for_ingredients_message = "No recipe for these ingredients"
 
 class Recipe(db.Model):
     def __init__(self, recipe: str = None):
@@ -154,13 +156,13 @@ db.create_all()
 
 @app.route('/api/recipe', methods=['GET'])
 def get_recipe_by_ingredients():
-    global db
+    global db, no_recipes_message, no_recipes_for_ingredients_message
     recipes = Recipe.query.all()
     if len(Recipe.query.all()) == 0:
-        return "No recipe here yet"
+        return json.dumps({'error': no_recipes_message})
     else:
         if 'ingredients' not in request.args:
-            return "No recipe for these ingredients"
+            return json.dumps({'error': no_recipes_for_ingredients_message})
         ingredients = request.args['ingredients'].split('|')
         recipe_found = False
         for recipe_db in recipes:
@@ -181,7 +183,7 @@ def get_recipe_by_ingredients():
                     recipe_found = True
             if recipe_found:
                 return "["+Recipe_info(recipe_db, ingredients_from_base).to_json_with_id(recipe_db.id)+"]"
-        return "No recipe for these ingredients"
+        return json.dumps({'error': no_recipes_for_ingredients_message})
 
 
 @app.route('/api/recipe/<id>', methods=['DELETE'])

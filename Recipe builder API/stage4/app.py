@@ -116,7 +116,8 @@ class Recipe_info:
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///recipes.db'
 db = SQLAlchemy(app)
-
+no_recipes_message = "No recipe here yet"
+no_recipes_for_ingredients_message = "No recipe for these ingredients"
 
 class Recipe(db.Model):
     def __repr__(self):
@@ -157,8 +158,6 @@ class Recipe(db.Model):
     @hybrid_property
     def directions_original(self):
         return self._directions
-
-
 class Ingredientdb(db.Model):
     __tablename__ = "ingredient"
     id = db.Column(db.Integer, primary_key=True)
@@ -195,7 +194,7 @@ db.create_all()
 
 @app.route('/api/recipe/<id>', methods=['DELETE'])
 def delete_recipe_by_id(id):
-    global db
+    global db, no_recipes_message, no_recipes_for_ingredients_message
     recipe = Recipe.query.get(id)
     if recipe is None:
         return Response(status=404)
@@ -258,10 +257,10 @@ def get_recipe_by_ingredients():
     global db
     recipes = Recipe.query.all()
     if len(Recipe.query.all()) == 0:
-        return "No recipe here yet"
+        return json.dumps({'error': no_recipes_message})
     else:
         if 'ingredients' not in request.args:
-            return "No recipe for these ingredients"
+            return "[]"
         if 'max_directions' in request.args:
             new_recipes=[]
             max_directions = request.args['max_directions']

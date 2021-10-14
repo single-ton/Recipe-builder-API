@@ -76,9 +76,6 @@ class Recipe_info:
         return jsonStr
     def get_ingredients_url_parameters(self):
         return "|".join([ingredient.title for ingredient in self.ingredients])
-
-
-
 class Recipe_info_with_id(Recipe_info) :
     id: int
     def __str__(self, without_id=True):
@@ -148,39 +145,34 @@ app = Flask(__name__)
 
 recipes = []
 current_index = 1
-
+no_recipes_message = "No recipe here yet"
+no_recipes_for_ingredients_message = "No recipe for these ingredients"
 
 @app.route('/api/recipe', methods=['GET'])
 def get_recipes_by_ingredients():
-    global recipes
+    global recipes, no_recipes_message, no_recipes_for_ingredients_message
     return_recipes=[]
     if len(recipes) == 0:
-        return "No recipe here yet"
+        return json.dumps({'error': no_recipes_message})
     else:
         if 'ingredients' not in request.args:
-            return "No recipe for these ingredients"
+            return json.dumps({'error': no_recipes_for_ingredients_message})
         ingredients = request.args['ingredients'].split('|')
-        searched_recipe:Recipe_info_with_id = None
         for recipe in recipes:
-            searched_recipe = recipe
-            ingredients2 = recipe.get_ingredients_url_parameters().split('|')
-            ingredient_exists = False
-            for ingredient1 in ingredients:
-                ingredient_exists = False
-                for ingredient2 in ingredients2:
-                    if ingredient1==ingredient2:
-                        ingredient_exists=True
-                        break
-                if ingredient_exists:
-                    continue
-                else:
-                    break
+            ingredients_current_recipe = recipe.get_ingredients_url_parameters().split('|')
+            ingredient_exists = True
+            for ingredient in ingredients_current_recipe:
+                if ingredient not in ingredients:
+                    ingredient_exists = False
+                    break;
+
             if ingredient_exists:
                 return_recipes.append(recipe)
         if len(return_recipes) != 0:
             return "["+','.join([str(r) for r in return_recipes])+"]"
         else:
-            return "No recipe for these ingredients"
+            return json.dumps({'error': no_recipes_for_ingredients_message})
+
 @app.route('/api/recipe/<id>', methods=['GET'])
 def get_recipe_by_id(id):
     global recipes
